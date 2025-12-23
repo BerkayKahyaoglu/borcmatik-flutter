@@ -1,0 +1,53 @@
+name: borcmatik
+description: "A new Flutter project."
+publish_to: 'none'
+
+version: 1.0.0+1
+
+environment:
+  sdk: ^3.9.0
+
+dependencies:
+  flutter:
+    sdk: flutter
+  firebase_core: ^3.6.0
+  firebase_auth: ^5.3.1
+  cloud_firestore: ^5.4.4
+  flutter_riverpod: ^2.4.9
+  riverpod_annotation: ^2.3.3
+  intl: ^0.20.2
+  uuid: ^4.2.2
+  cupertino_icons: ^1.0.8
+  lottie: ^3.3.2
+  google_fonts: ^6.3.3
+  firebase_messaging: ^15.2.10
+  flutter_local_notifications: ^19.5.0
+  http: ^1.6.0
+  googleapis_auth: ^2.0.0
+  image_picker: ^1.2.1
+  firebase_storage: ^12.4.10
+  url_launcher: ^6.3.2
+
+dev_dependencies:
+  flutter_test:
+    sdk: flutter
+  build_runner: ^2.4.7
+  riverpod_generator: ^2.3.9
+  flutter_launcher_icons: "^0.13.1"
+  flutter_lints: ^5.0.0
+
+# --- İKON AYARLARI ---
+flutter_launcher_icons:
+  android: "launcher_icon"
+  ios: true
+  image_path: "assets/icon/borcmatik_icon.png"
+  min_sdk_android: 21
+
+# --- FLUTTER AYARLARI (Assets Buraya Gelmeli) ---
+flutter:
+  uses-material-design: true
+
+  # Dosya yollarını buraya ekledik (Doğru yer burasıdır)
+  assets:
+    - assets/icon/
+    - assets/animations/

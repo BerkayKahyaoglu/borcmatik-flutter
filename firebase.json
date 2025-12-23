@@ -1,0 +1,39 @@
+{
+  "flutter": {
+    "platforms": {
+      "android": {
+        "default": {
+          "projectId": "borcmatik-v2",
+          "appId": "1:668408981680:android:3344a59a11fccda27cf375",
+          "fileOutput": "android/app/google-services.json"
+        }
+      },
+      "dart": {
+        "lib/firebase_options.dart": {
+          "projectId": "borcmatik-v2",
+          "configurations": {
+            "android": "1:668408981680:android:3344a59a11fccda27cf375",
+            "ios": "1:668408981680:ios:c993a131245498fe7cf375",
+            "macos": "1:668408981680:ios:c993a131245498fe7cf375",
+            "web": "1:668408981680:web:2e5a0ef9f04856ee7cf375",
+            "windows": "1:668408981680:web:2e7d3423142d7c927cf375"
+          }
+        }
+      }
+    }
+  },
+  "hosting": {
+    "public": "build/web",
+    "ignore": [
+      "firebase.json",
+      "**/.*",
+      "**/node_modules/**"
+    ],
+    "rewrites": [
+      {
+        "source": "**",
+        "destination": "/index.html"
+      }
+    ]
+  }
+}
