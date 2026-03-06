@@ -1,7 +1,8 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
-import 'package:flutter/services.dart'; // IBAN Kopyalamak için gerekli
+import 'package:flutter/services.dart';
+import 'package:borcmatik/pages/login_page.dart';
 
 class ProfilePage extends StatefulWidget {
   const ProfilePage({super.key});
@@ -25,7 +26,6 @@ class _ProfilePageState extends State<ProfilePage> {
     _loadUserData();
   }
 
-  // --- KULLANICI VERİLERİNİ YÜKLE ---
   Future<void> _loadUserData() async {
     setState(() => _isLoading = true);
     try {
@@ -46,7 +46,6 @@ class _ProfilePageState extends State<ProfilePage> {
     }
   }
 
-  // --- PROFİLİ KAYDET/GÜNCELLE ---
   Future<void> _saveProfile() async {
     if (_nameController.text.trim().isEmpty) {
       _showSnackBar("İsim alanı boş bırakılamaz!", Colors.orange);
@@ -57,20 +56,18 @@ class _ProfilePageState extends State<ProfilePage> {
     try {
       final user = _auth.currentUser;
       if (user != null) {
-        // 1. Auth profilini güncelle
         await user.updateDisplayName(_nameController.text.trim());
 
-        // 2. Firestore verilerini güncelle
         await _firestore.collection('users').doc(user.uid).set({
           'name': _nameController.text.trim(),
-          'iban': _ibanController.text.trim().toUpperCase(),
+          'iban': _ibanController.text.trim().toUpperCase(), // IBAN genelde büyük harf tutulur
           'email': user.email,
           'lastUpdated': FieldValue.serverTimestamp(),
         }, SetOptions(merge: true));
 
         if (mounted) {
           _showSnackBar("Profil başarıyla güncellendi! ✅", Colors.teal);
-          FocusScope.of(context).unfocus(); // Klavyeyi kapat
+          FocusScope.of(context).unfocus();
         }
       }
     } catch (e) {
@@ -80,7 +77,6 @@ class _ProfilePageState extends State<ProfilePage> {
     }
   }
 
-  // --- IBAN KOPYALAMA YARDIMCISI ---
   void _copyToClipboard() {
     if (_ibanController.text.isNotEmpty) {
       Clipboard.setData(ClipboardData(text: _ibanController.text));
@@ -109,7 +105,6 @@ class _ProfilePageState extends State<ProfilePage> {
         padding: const EdgeInsets.all(25.0),
         child: Column(
           children: [
-            // 1. Profil Resmi Alanı
             Stack(
               children: [
                 CircleAvatar(
@@ -120,10 +115,13 @@ class _ProfilePageState extends State<ProfilePage> {
                 Positioned(
                   bottom: 0,
                   right: 0,
-                  child: Container(
-                    padding: const EdgeInsets.all(4),
-                    decoration: const BoxDecoration(color: Colors.teal, shape: BoxShape.circle),
-                    child: const Icon(Icons.camera_alt, color: Colors.white, size: 20),
+                  child: GestureDetector(
+                    onTap: () => _showSnackBar("Profil fotoğrafı yükleme özelliği yakında! 📸", Colors.teal),
+                    child: Container(
+                      padding: const EdgeInsets.all(8),
+                      decoration: const BoxDecoration(color: Colors.teal, shape: BoxShape.circle),
+                      child: const Icon(Icons.camera_alt, color: Colors.white, size: 20),
+                    ),
                   ),
                 ),
               ],
@@ -143,7 +141,6 @@ class _ProfilePageState extends State<ProfilePage> {
             ),
             const SizedBox(height: 20),
 
-            // 3. IBAN Girişi
             _buildProfileField(
               controller: _ibanController,
               label: "IBAN Numaranız",
@@ -162,7 +159,6 @@ class _ProfilePageState extends State<ProfilePage> {
 
             const SizedBox(height: 40),
 
-            // 4. Güncelleme Butonu
             SizedBox(
               width: double.infinity,
               height: 55,
@@ -171,6 +167,8 @@ class _ProfilePageState extends State<ProfilePage> {
                 style: ElevatedButton.styleFrom(
                   shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(15)),
                   elevation: 2,
+                  backgroundColor: Colors.teal, // ✨ Buton Rengi Belirginleştirildi
+                  foregroundColor: Colors.white,
                 ),
                 child: _isSaving
                     ? const CircularProgressIndicator(color: Colors.white)
@@ -180,14 +178,19 @@ class _ProfilePageState extends State<ProfilePage> {
 
             const SizedBox(height: 20),
 
-            // 5. Çıkış Yap Butonu
             TextButton.icon(
               onPressed: () async {
                 await _auth.signOut();
-                if (mounted) Navigator.pop(context);
+                if (mounted) {
+                  Navigator.pushAndRemoveUntil(
+                    context,
+                    MaterialPageRoute(builder: (context) => const LoginPage()),
+                        (route) => false,
+                  );
+                }
               },
               icon: const Icon(Icons.logout, color: Colors.redAccent),
-              label: const Text("Çıkış Yap", style: TextStyle(color: Colors.redAccent, fontWeight: FontWeight.bold)),
+              label: const Text("Çıkış Yap", style: TextStyle(color: Colors.redAccent, fontWeight: FontWeight.bold, fontSize: 16)),
             ),
           ],
         ),
@@ -195,7 +198,6 @@ class _ProfilePageState extends State<ProfilePage> {
     );
   }
 
-  // Profil Sayfasına Özel Tasarlanmış Input
   Widget _buildProfileField({
     required TextEditingController controller,
     required String label,

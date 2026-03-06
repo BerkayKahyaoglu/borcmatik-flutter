@@ -1,13 +1,32 @@
 {
   "project_info": {
-    "project_number": "668408981680",
-    "project_id": "borcmatik-v2",
-    "storage_bucket": "borcmatik-v2.firebasestorage.app"
+    "project_number": "179929894594",
+    "project_id": "borcmatik",
+    "storage_bucket": "borcmatik.firebasestorage.app"
   },
   "client": [
     {
       "client_info": {
-        "mobilesdk_app_id": "1:668408981680:android:3344a59a11fccda27cf375",
+        "mobilesdk_app_id": "1:179929894594:android:792efe6b7e7d81c4fc355b",
+        "android_client_info": {
+          "package_name": "com.bk.borcmatik"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyAkwVY6wEBwTmZbfxpnWYlZxlVNtTkhtAI"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    },
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:179929894594:android:15ffaf248b631674fc355b",
         "android_client_info": {
           "package_name": "com.example.borcmatik"
         }
@@ -15,7 +34,7 @@
       "oauth_client": [],
       "api_key": [
         {
-          "current_key": "AIzaSyAWCwxODqXw0aQYa1LW-A9VwAdLlvMTPXo"
+          "current_key": "AIzaSyAkwVY6wEBwTmZbfxpnWYlZxlVNtTkhtAI"
         }
       ],
       "services": {

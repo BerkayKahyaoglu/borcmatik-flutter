@@ -12,16 +12,13 @@ import 'package:flutter/foundation.dart'; // Web kontrolü için (kIsWeb)
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
-
-  // "Spy Mode" (Hata Yakalayıcı) ile başlatıyoruz
+  
   try {
     await Firebase.initializeApp(
       options: DefaultFirebaseOptions.currentPlatform,
     );
 
-    // 🔥 GÜVENLİ BİLDİRİM BAŞLATMA.
     try {
-      // Web'de bazen NotificationService farklı davranabilir, hata verirse yutuyoruz.
       await NotificationService.initialize();
       print("✅ Bildirim servisi başarıyla başlatıldı.");
     } catch (e) {
@@ -31,12 +28,10 @@ void main() async {
     runApp(const ProviderScope(child: MyApp()));
 
   } catch (e) {
-    // Eğer Firebase'in kendisi çökerse yine kırmızı ekran göster
     runApp(ErrorApp(errorMsg: e.toString()));
   }
 }
 
-// Hata durumunda çıkacak basit ekran (Widget olarak ayırdık)
 class ErrorApp extends StatelessWidget {
   final String errorMsg;
   const ErrorApp({super.key, required this.errorMsg});
@@ -108,7 +103,6 @@ class _AuthCheckState extends State<AuthCheck> {
 
   void _printFcmToken() async {
     try {
-      // Eğer Web ise ve VapidKey yoksa hata verebilir, o yüzden catch'e düşer ve uygulama çökmez.
       String? token = await FirebaseMessaging.instance.getToken();
       print("🚀 [FCM TOKEN]: $token");
     } catch (e) {

@@ -4,6 +4,8 @@ import 'package:borcmatik/pages/profile_page.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
+import '../widgets/create_group_dialog.dart';
+import '../widgets/add_friend_dialog.dart';
 
 class HomePage extends StatefulWidget {
   const HomePage({super.key});
@@ -14,7 +16,6 @@ class HomePage extends StatefulWidget {
 
 class _HomePageState extends State<HomePage> {
 
-  // --- ÇIKIŞ YAP ---
   void _logout() async {
     await FirebaseAuth.instance.signOut();
     if (mounted) {
@@ -25,233 +26,39 @@ class _HomePageState extends State<HomePage> {
     }
   }
 
-  // --- 🔍 YARDIMCI: AKILLI İSİM GÖSTERME ---
   String _getDynamicGroupName(Map<String, dynamic> data, String myUid) {
     if (data['isPrivate'] == true && data.containsKey('namesMap')) {
       Map<String, dynamic> names = data['namesMap'];
-      String otherUid = names.keys.firstWhere(
-              (k) => k != myUid,
-          orElse: () => ""
-      );
-      if (otherUid.isNotEmpty && names[otherUid] != null) {
-        return names[otherUid];
-      }
+      String otherUid = names.keys.firstWhere((k) => k != myUid, orElse: () => "");
+      if (otherUid.isNotEmpty && names[otherUid] != null) return names[otherUid];
     }
     return data['name'] ?? "İsimsiz";
   }
 
-  // --- 🔥 GÜVENLİ SİLME FONKSİYONU (HER ŞEYİ TEMİZLER) ---
-  // isFriend: Eğer bu bir arkadaş ise (true), onu hızlı erişim listesinden de sileriz.
   Future<void> _deleteGroupSafely(String groupId, String groupName, {bool isFriend = false}) async {
     try {
-      // 1. Önce harcamaları bul
-      var expensesSnapshot = await FirebaseFirestore.instance
-          .collection('groups')
-          .doc(groupId)
-          .collection('expenses')
-          .get();
-
-      // 2. Toplu silme işlemi başlat (Batch)
+      var expensesSnapshot = await FirebaseFirestore.instance.collection('groups').doc(groupId).collection('expenses').get();
       WriteBatch batch = FirebaseFirestore.instance.batch();
 
-      // Tüm harcamaları silme listesine ekle
-      for (var doc in expensesSnapshot.docs) {
-        batch.delete(doc.reference);
-      }
-
-      // 3. Grubun kendisini silme listesine ekle
+      for (var doc in expensesSnapshot.docs) batch.delete(doc.reference);
       batch.delete(FirebaseFirestore.instance.collection('groups').doc(groupId));
 
-      // 4. Eğer bu bir arkadaş ise, "users -> friends" listesinden de sil
       if (isFriend) {
         final user = FirebaseAuth.instance.currentUser!;
-
-        // Bu arkadaşın UID'sini bulalım (Grubun üyelerinden ben olmayanı bul)
         var groupDoc = await FirebaseFirestore.instance.collection('groups').doc(groupId).get();
         if (groupDoc.exists) {
           List members = groupDoc.data()!['members'];
           String friendUid = members.firstWhere((id) => id != user.uid, orElse: () => "");
-
           if (friendUid.isNotEmpty) {
-            batch.delete(FirebaseFirestore.instance
-                .collection('users')
-                .doc(user.uid)
-                .collection('friends')
-                .doc(friendUid));
+            batch.delete(FirebaseFirestore.instance.collection('users').doc(user.uid).collection('friends').doc(friendUid));
           }
         }
       }
-
-      // 5. Hepsini uygula!
       await batch.commit();
-
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text("$groupName tamamen silindi 🗑️"), backgroundColor: Colors.red),
-        );
-      }
+      if (mounted) ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text("$groupName tamamen silindi 🗑️"), backgroundColor: Colors.red));
     } catch (e) {
-      print("Silme hatası: $e");
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text("Silinirken hata oluştu."), backgroundColor: Colors.red),
-        );
-      }
+      if (mounted) ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text("Silinirken hata oluştu."), backgroundColor: Colors.red));
     }
-  }
-
-  // --- 🔥 YENİ GRUP OLUŞTURMA ---
-  void _showCreateGroupDialog() {
-    final nameController = TextEditingController();
-    showDialog(
-      context: context,
-      builder: (context) => AlertDialog(
-        title: const Text("Yeni Grup Oluştur"),
-        content: TextField(
-          controller: nameController,
-          decoration: const InputDecoration(labelText: "Grup Adı", border: OutlineInputBorder()),
-        ),
-        actions: [
-          TextButton(onPressed: () => Navigator.pop(context), child: const Text("İptal")),
-          ElevatedButton(
-            style: ElevatedButton.styleFrom(backgroundColor: Colors.teal, foregroundColor: Colors.white),
-            onPressed: () async {
-              if (nameController.text.isNotEmpty) {
-                final user = FirebaseAuth.instance.currentUser!;
-                await FirebaseFirestore.instance.collection('groups').add({
-                  'name': nameController.text.trim(),
-                  'members': [user.uid],
-                  'memberEmails': [user.email],
-                  'createdAt': FieldValue.serverTimestamp(),
-                  'createdBy': user.uid,
-                  'isPrivate': false,
-                  'totalDebt': 0,
-                });
-                if (mounted) Navigator.pop(context);
-              }
-            },
-            child: const Text("Oluştur"),
-          ),
-        ],
-      ),
-    );
-  }
-
-  // --- 🔥 ARKADAŞ EKLEME ---
-  void _showAddByEmailDialog() {
-    final emailController = TextEditingController();
-
-    showDialog(
-      context: context,
-      builder: (context) {
-        bool isLoading = false;
-        String? errorMessage;
-
-        return StatefulBuilder(
-          builder: (context, setState) {
-            return AlertDialog(
-              title: const Text("Arkadaş Ekle ➕"),
-              content: Column(
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  const Text("Eklemek istediğin arkadaşının e-posta adresini gir."),
-                  const SizedBox(height: 10),
-                  TextField(
-                    controller: emailController,
-                    keyboardType: TextInputType.emailAddress,
-                    decoration: InputDecoration(
-                      labelText: "E-posta",
-                      hintText: "ornek@gmail.com",
-                      border: const OutlineInputBorder(),
-                      prefixIcon: const Icon(Icons.email),
-                      errorText: errorMessage,
-                    ),
-                  ),
-                ],
-              ),
-              actions: [
-                TextButton(
-                    onPressed: () => Navigator.pop(context),
-                    child: const Text("İptal", style: TextStyle(color: Colors.grey))
-                ),
-                ElevatedButton(
-                  style: ElevatedButton.styleFrom(backgroundColor: Colors.teal, foregroundColor: Colors.white),
-                  onPressed: isLoading ? null : () async {
-                    final email = emailController.text.trim().toLowerCase();
-                    final currentUser = FirebaseAuth.instance.currentUser!;
-
-                    if (email.isEmpty) return;
-                    if (email == currentUser.email) {
-                      setState(() => errorMessage = "Kendini ekleyemezsin.");
-                      return;
-                    }
-
-                    setState(() { isLoading = true; errorMessage = null; });
-
-                    try {
-                      final friendQuery = await FirebaseFirestore.instance.collection('users').where('email', isEqualTo: email).limit(1).get();
-
-                      if (friendQuery.docs.isEmpty) {
-                        setState(() { isLoading = false; errorMessage = "Kullanıcı bulunamadı."; });
-                        return;
-                      }
-
-                      final friendDoc = friendQuery.docs.first;
-                      final friendUid = friendDoc.id;
-                      final friendName = friendDoc.data()['name'] ?? "İsimsiz";
-                      final friendEmail = friendDoc.data()['email'] ?? email;
-
-                      final myDoc = await FirebaseFirestore.instance.collection('users').doc(currentUser.uid).get();
-                      final myName = myDoc.data()?['name'] ?? currentUser.email!.split('@')[0];
-
-                      // Zaten var mı kontrolü
-                      final existingCheck = await FirebaseFirestore.instance.collection('groups').where('members', arrayContains: currentUser.uid).get();
-                      bool alreadyExists = false;
-                      for (var doc in existingCheck.docs) {
-                        final data = doc.data();
-                        if (data['isPrivate'] == true && (data['members'] as List).contains(friendUid)) {
-                          alreadyExists = true; break;
-                        }
-                      }
-
-                      if (alreadyExists) {
-                        setState(() { isLoading = false; errorMessage = "Zaten ekli."; });
-                        return;
-                      }
-
-                      // Grubu oluştur
-                      await FirebaseFirestore.instance.collection('groups').add({
-                        'name': friendName,
-                        'namesMap': { currentUser.uid: myName, friendUid: friendName },
-                        'members': [currentUser.uid, friendUid],
-                        'memberEmails': [currentUser.email, friendEmail],
-                        'createdAt': FieldValue.serverTimestamp(),
-                        'createdBy': currentUser.uid,
-                        'isPrivate': true,
-                        'totalDebt': 0,
-                      });
-
-                      // Friends listesine ekle
-                      await FirebaseFirestore.instance.collection('users').doc(currentUser.uid).collection('friends').doc(friendUid).set({
-                        'uid': friendUid, 'name': friendName, 'email': friendEmail, 'addedAt': FieldValue.serverTimestamp(),
-                      });
-
-                      if (mounted) {
-                        Navigator.pop(context);
-                        ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text("$friendName eklendi! ✅"), backgroundColor: Colors.teal));
-                      }
-                    } catch (e) {
-                      setState(() { isLoading = false; errorMessage = "Hata: $e"; });
-                    }
-                  },
-                  child: isLoading ? const SizedBox(width: 20, height: 20, child: CircularProgressIndicator(color: Colors.white, strokeWidth: 2)) : const Text("Ekle"),
-                ),
-              ],
-            );
-          },
-        );
-      },
-    );
   }
 
   // --- TOPLAM DURUM KARTI ---
@@ -260,8 +67,15 @@ class _HomePageState extends State<HomePage> {
     if (user == null) return const SizedBox();
 
     return StreamBuilder<QuerySnapshot>(
+      // collectionGroup ile tüm harcamaları dinliyoruz
       stream: FirebaseFirestore.instance.collectionGroup('expenses').snapshots(),
       builder: (context, snapshot) {
+        // 🔥 HATA YAKALAMA EKLENDİ! 🔥
+        if (snapshot.hasError) {
+          debugPrint("ÖZET KARTI HATASI: ${snapshot.error}");
+          return _buildCardDesign("Hata", "Konsola Bak");
+        }
+
         if (snapshot.connectionState == ConnectionState.waiting) return _buildCardDesign("...", "...");
 
         double totalAlacak = 0;
@@ -291,6 +105,7 @@ class _HomePageState extends State<HomePage> {
             else if (receiverUid == user.uid) totalAlacak -= amount;
           }
         }
+
         if (totalAlacak < 0.01) totalAlacak = 0;
         if (totalVerecek < 0.01) totalVerecek = 0;
 
@@ -325,10 +140,8 @@ class _HomePageState extends State<HomePage> {
     );
   }
 
-  // --- 🔥 NORMAL GRUP KARTI (SİLME ÖZELLİĞİ EKLENDİ) ---
   Widget _buildNormalGroupCard(Map<String, dynamic> data, String docId) {
     return GestureDetector(
-      // 🔥 BURASI YENİ: Normal gruba da basılı tutunca silme menüsü çıkacak
       onLongPress: () {
         showDialog(
           context: context,
@@ -340,7 +153,7 @@ class _HomePageState extends State<HomePage> {
               ElevatedButton(
                 style: ElevatedButton.styleFrom(backgroundColor: Colors.red, foregroundColor: Colors.white),
                 onPressed: () async {
-                  await _deleteGroupSafely(docId, data['name'], isFriend: false); // isFriend: false
+                  await _deleteGroupSafely(docId, data['name'], isFriend: false);
                   if (mounted) Navigator.pop(context);
                 },
                 child: const Text("SİL"),
@@ -369,7 +182,6 @@ class _HomePageState extends State<HomePage> {
     );
   }
 
-  // --- 🔥 ARKADAŞ KARTI (GÜVENLİ SİLME EKLENDİ) ---
   Widget _buildFriendCircle(Map<String, dynamic> data, String docId) {
     final myUid = FirebaseAuth.instance.currentUser!.uid;
     final displayName = _getDynamicGroupName(data, myUid);
@@ -387,7 +199,6 @@ class _HomePageState extends State<HomePage> {
               ElevatedButton(
                 style: ElevatedButton.styleFrom(backgroundColor: Colors.red, foregroundColor: Colors.white),
                 onPressed: () async {
-                  // isFriend: true diyoruz ki Hızlı Erişim'den de silsin
                   await _deleteGroupSafely(docId, displayName, isFriend: true);
                   if (mounted) Navigator.pop(context);
                 },
@@ -426,7 +237,9 @@ class _HomePageState extends State<HomePage> {
 
   Widget _buildAddFriendButton() {
     return GestureDetector(
-      onTap: _showAddByEmailDialog,
+      onTap: () {
+        showDialog(context: context, builder: (context) => const AddFriendDialog());
+      },
       child: Container(
         width: 75,
         margin: const EdgeInsets.symmetric(horizontal: 4),
@@ -503,7 +316,13 @@ class _HomePageState extends State<HomePage> {
       ),
       floatingActionButton: Padding(
         padding: const EdgeInsets.only(bottom: 140.0),
-        child: FloatingActionButton(onPressed: _showCreateGroupDialog, backgroundColor: Colors.teal, child: const Icon(Icons.add, color: Colors.white)),
+        child: FloatingActionButton(
+            onPressed: () {
+              showDialog(context: context, builder: (context) => const CreateGroupDialog());
+            },
+            backgroundColor: Colors.teal,
+            child: const Icon(Icons.add, color: Colors.white)
+        ),
       ),
     );
   }
